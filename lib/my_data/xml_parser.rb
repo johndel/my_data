@@ -32,13 +32,25 @@ module MyData::XmlParser
   end
 
   def fix_xml(xml)
-    xml.strip.gsub("&lt;", "<").gsub("&gt;", ">")
+    cleaned = xml.gsub(/<\?xml[^>]*\?>/, '')
+    decoded = CGI.unescapeHTML(cleaned)
+
+    if decoded.match(/<string[^>]*>(.*)<\/string>/m)
+      content = $1.strip
+      content.gsub!(/\A<\?xml[^>]*\?>/, '')
+      content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>#{content}"
+    else
+      content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>#{decoded.strip}"
+    end
+
+    # Replace any remaining escaped characters and force encoding to UTF-8
+    final_content = content.gsub("&lt;", "<").gsub("&gt;", ">")
+    final_content.encode("UTF-8", "binary", invalid: :replace, undef: :replace, replace: "").strip
   end
 
   def transofrm_xml_to_hash(xml)
-    Hash
-      .from_xml(xml)
-      .deep_transform_keys(&:underscore)["string"]
+    hash = Hash.from_xml(xml).deep_transform_keys(&:underscore)
+    hash["string"] || hash
   end
 
   def flatten(hash, resource)
